@@ -1,95 +1,118 @@
-try:
-    from random import randint;M=0
-    import os,sys,json
-    if os.name=='nt':
-        import ctypes
-        kernel32=ctypes.windll.kernel32
-        handle=kernel32.GetStdHandle(-11)
-        mode=ctypes.c_ulong()
-        kernel32.GetConsoleMode(handle, ctypes.byref(mode))
-        mode.value |= 0x0004
-        kernel32.SetConsoleMode(handle, mode)
-    else:print('WARNING: this version is made for Windows, you might run into errors / wierd behaviures')
-    def cls():os.system('cls' if os.name == 'nt' else 'clear');return''
-    def get_base_path():return os.path.dirname(sys.executable) if getattr(sys,"frozen",False) else os.path.dirname(__file__)
-    dir=get_base_path()
-    class Storage:
-        def __init__(self,directory=None):
-            self.directory=directory or get_base_path()
-            if not os.path.exists(self.directory):os.makedirs(self.directory)
-        def _get_path(self, filename):return os.path.join(self.directory, filename)
-        def save(self, filename, content: bytes):
-            if isinstance(content, str):content=content.encode()
-            content=bytes([b^0xAA for b in content])
-            with open(self._get_path(filename),'wb') as f:f.write(content)
-        def load(self,filename)->bytes:
-            path=self._get_path(filename)
-            if not os.path.exists(path):raise FileNotFoundError(f"No such file: {path}")
-            with open(path,'rb') as f:content=f.read()
-            content=bytes([b^0xAA for b in content])
-            return content
-        def delete(self, filename):
-            path=self._get_path(filename)
-            if os.path.exists(path):os.remove(path);return True
-            return False
-    savedata=Storage('savedata')
-    save_name='default'
-    try:high=json.loads(savedata.load(save_name+'.dat').decode())
-    except:high={'e':2147483648,'m':2147483648,'h':2147483648}
-    def inputInt(*s,sep=' ',Exit=None):
-        while 1:
-            r=input(sep.join(s)+'\033[36m')
-            if r==Exit:print('\033[0m',end='');return 'exit'
-            try:print('\033[0m',end='');return int(r)
-            except ValueError:print(f'\033[33m"{r}" is not an integer!\033[0m')
-    def Game(min=1,max=10,a=None,f=1,gm='c'):
-        global high,savedata,save_name
-        r,lowest,highest=randint(min,max),min,max
-        while a!=r:
-            a=inputInt(f'Guess a number \033[36m{min}\033[0m to \033[36m{max}\033[0m: 'if a==None else 'Try again: ',Exit='exit')
-            if a=='exit':return 'exit'
-            if a==r:
-                if gm in high:
-                    if high[gm]>f:high[gm]=f
-                    savedata.save(save_name+'.dat',str(json.dumps(high)))
-                input(f'\033[32mCorrect!! the number was "\033[36m{r}\033[32m"!\n\033[0mIt took you \033[36m{f}\033[0m attempt{"s"if f>1 else""} to figure that out!')
-            else:
-                if a>r:highest=a-1 if highest>a-1 else highest;print(cls()+f'Wrong! The number it smaller than "\033[36m{a}\033[0m" ({f"\033[36m{lowest}\033[0m - \033[36m{highest}\033[0m"if highest!=lowest else f"\033[36m{highest}\033[0m"})')
-                else:lowest=a+1 if lowest<a+1 else lowest;print(cls()+f'Wrong! The number it higher than "\033[36m{a}\033[0m" ({f"\033[36m{lowest}\033[0m - \033[36m{highest}\033[0m"if highest!=lowest else f"\033[36m{highest}\033[0m"})')
-            f+=1
-            if f>=2147483648:print(f'Okay bro, how bad can someone be at a game? {f} attempts...');return'exit'
-        return 0
-    def Menu(o={'1':[1,10,'e'],'2':[1,100,'m'],'3':[1,1000,'h'],'easy':[1,10,'e'],'medium':[1,100,'m'],'hard':[1,1000,'h'],'e':[1,10,'e'],'m':[1,100,'m'],'h':[1,1000,'h'],'custom':['c'],'c':['c'],'4':['c'],'exit':['exit'],'reset':['reset'],'del':['reset'],'delete':['reset'],'chs':['chs'],'save':['chs'],'cd':['chs'],'commands':['cmd'],'cmd':['cmd'],'cmds':['cmd'],'command':['cmd']}):
-        while 1:
-            global high,savedata,save_name;a=input(cls()+'\033[0mPlaying on save: \033[32m'+save_name+'\n\033[4m\033[1m\033[31mGAME MODES\033[0m\033[31m:\n\033[33mEasy: \033[36m1\033[0m to \033[36m10'+(f' \033[0m(High: \033[36m{high["e"]}\033[0m)'if high['e']!=2147483648 else'')+'\n\033[33mMedium: \033[36m1\033[0m to \033[36m100'+(f' \033[0m(High: \033[36m{high["m"]}\033[0m)'if high['m']!=2147483648 else'')+'\n\033[33mHard: \033[36m1\033[0m to \033[36m1000'+(f' \033[0m(High: \033[36m{high["h"]}\033[0m)'if high['h']!=2147483648 else'')+'\n\033[33mCustom:\033[0m You decide!\n\033[31mDo "\033[36mcmd\033[31m" for command list.\n\033[32m>>> \033[36m').lower();print('\033[0m',end='')
-            if a in o:
-                if o[a][0]=='c':
-                    tmin=inputInt(cls()+'Minimum: ',Exit='exit')
-                    if tmin=='exit':return 0
-                    while 1:
-                        tmax=inputInt('Maximum: ',Exit='exit')
-                        if tmax=='exit':return 0
-                        elif tmax>=tmin:break
-                        print(cls()+f"\033[32mMaximum\033[0m must be more than or equal to '\033[36m{tmin}\033[0m'")
-                    cls();Game(tmin,tmax,gm='c')
-                elif o[a][0]=='exit':return 2
-                elif o[a][0]=='chs':
-                    while 1:
-                        a=input(cls()+f'Currently on: \033[32m{save_name}\n\033[0mSave name: ').lower()
-                        if len(a)>0:break
-                    save_name=str(a)
-                    try:high=json.loads(savedata.load(save_name+'.dat').decode())
-                    except:high={'e':2147483648,'m':2147483648,'h':2147483648}
-                    return 0
-                elif o[a][0]=='reset':
-                    while 1:
-                        a=input(cls()+'\033[31mARE YOU SURE YOU WANT TO DELETE YOUR SAVE FILE? (\033[33mY\033[31m / \033[33mN\033[31m):\033[0m ').lower()
-                        if len(a)>0:
-                            if a[0]=='y':high={'e':2147483648,'m':2147483648,'h':2147483648};savedata.delete(save_name+'.dat');return 0
-                            elif a[0]=='n':return 0
-                elif o[a][0]=='cmd':input('\033[31mCOMMANDS:\n\033[33m1 \033[36m/ \033[33me \033[36m/ \033[33measy\033[36m: \033[0mEasy mode\n\033[33m2 \033[36m/ \033[33mm \033[36m/ \033[33mmedium\033[36m: \033[0mMedium mode\n\033[33m3 \033[36m/ \033[33mh \033[36m/ \033[33mhard\033[36m: \033[0mHard mode\n\033[33m4 \033[36m/ \033[33mc \033[36m/ \033[33mcustom\033[36m: \033[0mCustom mode\n\033[33mexit\033[36m: \033[0mExit the game\n\033[33mdel \033[36m/ \033[33mdelete \033[36m/ \033[33mreset\033[36m: \033[0mReset highscores (and delete save file)\n\033[33mchs \033[36m/ \033[33mcd \033[36m/ \033[33msave\033[36m: \033[0mChange currently used save file\n\033[33mcmd \033[36m/ \033[33mcmds \033[36m/ \033[33mcommand \033[36m/ \033[33mcommands\033[36m: \033[0mSee command list\n\n\033[32mPress enter to return...');return 0
-                else:cls();Game(o[a][0],o[a][1],gm=o[a][2])
-                return 0
-    while M==0:M=Menu()
-except Exception as e:print(f'\033[31mError: {e}\033[0m');M=-1
-input(f'\033[32mGame exited with code "\033[36m{M}\033[32m"\033[0m...')
+#!/usr/bin/env python3
+from random import randint
+from pathlib import Path
+import json,os,sys,tempfile,pickle,atexit,signal
+def cls(*s):print("\033c",end="");return''
+class ansi:
+    u033,n='\033','\n'
+    def enable():
+        try:import ctypes;ctypes.windll.kernel32.SetConsoleMode(ctypes.windll.kernel32.GetStdHandle(-11),7)
+        except Exception:pass
+    def c(s, code):return f"\033[{code}m{s}\033[0m"
+    GREEN,CYAN,YELLOW,RED,BOLD,CLEAR,UNDERLINE=u033+'[32m',u033+'[36m',u033+'[33m',u033+'[31m',u033+'[1m',u033+'[0m',u033+'[4m'
+    green,cyan,yellow,red,bold,underline=(lambda s='':ansi.c(str(s),"32")),(lambda s='':ansi.c(str(s),"36")),(lambda s='':ansi.c(str(s),"33")),(lambda s='':ansi.c(str(s),"31")),(lambda s='':ansi.c(str(s),"1")),(lambda s='':ansi.c(str(s),"4"))
+def get_base_path():return os.path.dirname(sys.executable if getattr(sys,"frozen",0) else os.path.abspath(sys.argv[0]))
+dir=get_base_path().replace('\\','/');print(f'Got "{dir}" as current path.')
+class storage:
+    _key=0x55
+    def __init__(s,n):
+        b=os.path.dirname(sys.executable if getattr(sys,"frozen",0) else os.path.abspath(sys.argv[0]))
+        s.p=os.path.join(b,n); os.makedirs(s.p,exist_ok=True)
+    def _encode(s,b):return bytes([x^s._key for x in b])
+    def save(s,f,d):
+        with open(os.path.join(s.p,f),"wb") as file:file.write(s._encode(pickle.dumps(d, protocol=pickle.HIGHEST_PROTOCOL)))
+    def load(s,f):
+        with open(os.path.join(s.p,f),"rb") as file: return pickle.loads(s._encode(file.read()))
+    def delete(s,f):p=os.path.join(s.p,f);os.path.exists(p) and os.remove(p)
+    def exists(s,f):return os.path.exists(os.path.join(s.p,f))
+    def list(s):return os.listdir(s.p)
+MAXINT=9223372036854775807
+VERSION='3.1.pre2'
+ansi.enable()
+def _Stfu(*s):
+    global savedata
+    savedata[0]['version']=VERSION
+    savedata['pc'].save(savedata['name']+'.dat',savedata[0])
+def _Reset(*s):
+    global savedata
+    while 1:
+        _=oinput(cls()+'Current save file: '+ansi.green(savedata['name'])+'\n'+ansi.red('Are you sure you want to delete your save file?')+f' ( {ansi.cyan("Y")} / {ansi.cyan("N")} ): ').lower()
+        if (_=='y')or(_=='yes'):break
+        elif (_=='n')or(_=='no'):return
+    savedata[0]={'version':VERSION,'highscores':{'easy':int(MAXINT),'medium':int(MAXINT),'hard':int(MAXINT)}}
+    savedata['pc'].delete(savedata['name']+'.dat')
+def _Cd(*s,sep=' '):
+    global savedata
+    savedata['name']=sep.join(str(i)for i in s)
+    try:savedata[0]=savedata['pc'].load(savedata['name']+'.dat')
+    except:savedata[0]={'version':VERSION,'highscores':{'easy':int(MAXINT),'medium':int(MAXINT),'hard':int(MAXINT)}}
+savedata={'pc':storage('savedata'),'name':'default','menu_options':{
+    'exit':{'keywords':['exit'],'function':sys.exit,'cmd':'Exits the game'},
+    'easy':{'keywords':['easy','e','1'],'function':(lambda*s:Gissa_talet(1,10,'easy')),'description':(ansi.yellow('Easy')+': '+ansi.cyan(1)+' to '+ansi.cyan(10)),'cmd':f'Game mode {ansi.red("->")} easy ( {ansi.cyan("1")} to {ansi.cyan("10")} )'},
+    'medium':{'keywords':['medium','m','2'],'function':(lambda*s:Gissa_talet(1,100,'medium')),'description':(ansi.yellow('Medium')+': '+ansi.cyan(1)+' to '+ansi.cyan(100)),'cmd':f'Game mode {ansi.red("->")} medium ( {ansi.cyan("1")} to {ansi.cyan("100")} )'},
+    'hard':{'keywords':['hard','h',3],'function':(lambda*s:Gissa_talet(1,1000,'hard')),'description':(ansi.yellow('Hard')+': '+ansi.cyan(1)+' to '+ansi.cyan(1000)),'cmd':f'Game mode {ansi.red("->")} medium ( {ansi.cyan("1")} to {ansi.cyan("1000")} )'},
+    'custom':{'keywords':['custom','c','4'],'function':(lambda*s:Gissa_talet(oinput(ansi.CLEAR+'Minimum: '+ansi.CYAN,type=int,Error=ansi.yellow(f'"{ansi.cyan("{}")+ansi.YELLOW}" is not an integer.')),oinput(ansi.CLEAR+'Maximum: '+ansi.CYAN,type=int,Error=ansi.yellow(f'"{ansi.cyan("{}")+ansi.YELLOW}" is not an integer.')),'custom')),'description':(ansi.yellow('Custom')+': You decide!'),'cmd':f'Game mode {ansi.red("->")} custom ( you decide )'},
+    'debug':{'keywords':['debug'],'function':(lambda*s:print(VERSION,MAXINT,dir,get_base_path(),__file__,savedata)+read_line()),'cmd':'Info for nerds'},
+    'reset':{'keywords':['del','delete','reset'],'function':_Reset,'cmd':' Deletes the save file and resets all saved data'},
+    'cd':{'keywords':['chd','save','chs','cs','cd'],'function':(lambda*s:_Cd(oinput(cls()+f'Current save: {ansi.green(savedata["name"])}'+'\nSave name: '+ansi.GREEN))+cls()),'cmd':'Change the currently used save file'},
+    'stfu':{'keywords':['stfu'],'cmd':'Force updates the save file version','function':_Stfu},
+    }}
+_Cd('default')
+def oinput(*s,sep=' ',type=str,Error="'{}' is not valid",Exit=None,Exit_code=None):
+    while 1:
+        user_input=input(sep.join(str(i) for i in s))
+        if user_input==Exit:return Exit_code
+        try:return type(user_input)
+        except (ValueError,TypeError):print(Error.format(user_input))
+def onexit(*s):
+    print('Game exited.')
+    input('<<<')
+atexit.register(onexit);signal.signal(signal.SIGINT,(lambda*s:0));read_line=lambda:(__import__("msvcrt").getch().decode()if os.name=="nt"else __import__("sys").stdin.read(1))
+def Gissa_talet(minimum,maximum,gamemode='custom',ans=None,attempts=1):
+    global savedata
+    def _cls(*s):global savedata;print(f'{cls()}Gissa Talet ({ansi.yellow(gamemode)}) on {ansi.green(savedata['name'])}');return''
+    _cls();rand,possible_max,possible_min=randint(minimum,maximum),int(maximum),int(minimum)
+    while 1:
+        ans=oinput(f'Guess a number {ansi.cyan(minimum)} to {ansi.cyan(maximum)}: {ansi.CYAN}'if ans==None else f'Try again: {ansi.CYAN}',type=int,Exit='exit',Error=ansi.yellow(f'"{ansi.cyan("{}")+ansi.YELLOW}" is not an integer.'));print(end=ansi.CLEAR)
+        if ans==None:return
+        if ans==rand:
+            print(f"{ansi.green('Correct!')} The answer was '{ansi.cyan(rand)}'. It took you {ansi.cyan(attempts)} attempt{"s"if attempts!=1 else""}.")
+            if gamemode in savedata[0]['highscores']:
+                if savedata[0]['highscores'][gamemode]>attempts:
+                    savedata[0]['highscores'][gamemode]=int(attempts);print(ansi.bold(ansi.green('That is a new highscore!')))
+                    savedata['pc'].save(savedata['name']+'.dat',savedata[0])
+            read_line();return
+        else:
+            if ans>rand:possible_max=ans-1 if possible_max>ans-1 else possible_max
+            else:possible_min=ans+1 if possible_min<ans+1 else possible_min
+            attempts+=1;print(f"{_cls()+ansi.red('Wrong!')} The number is {'higher'if ans<rand else 'smaller'} than '{ansi.cyan(ans)}'. ({ansi.cyan(possible_min)+' - '+ansi.cyan(possible_max)if possible_min!=possible_max else ansi.cyan(possible_max)})")
+def init():
+    global savedata
+    while 1:
+        print(cls()+(f'{ansi.RED}WARNING: SAVE FILE VERSION ({ansi.CYAN+savedata[0]['version']+ansi.RED}) DOES NOT MATCH GAME VERSION ({ansi.CYAN+VERSION+ansi.RED})'+ansi.CLEAR+'\n' if savedata[0]['version']!=VERSION else'')+f'Playing on save: {ansi.green(savedata["name"])+ansi.n+ansi.red(ansi.bold(ansi.underline("GAME MODES")))+ansi.red(":")}')
+        for option in savedata['menu_options']:
+            if 'description'in savedata['menu_options'][option]:
+                print(savedata['menu_options'][option]['description'],((f"(Highscore: {ansi.cyan(savedata[0]['highscores'][option])} attempt{'s'if savedata[0]['highscores'][option]!=1 else""})"if savedata[0]['highscores'][option]!=MAXINT else'')if option in savedata[0]['highscores'] else''))
+        
+        ans=oinput(f"{ansi.RED}Do '{ansi.CYAN}cmd{ansi.RED}' for the command list{ansi.n}"+ansi.green('>>> ')+ansi.CYAN).lower();print(end=ansi.CLEAR,flush=True)
+        if ans in ['cmd','commands','cmds']:
+            print(f'{ansi.red(ansi.bold("COMMANDS")+":")}'+(f"{ansi.n+ansi.yellow('cmd')+ansi.CYAN} / {ansi.yellow('commands')+ansi.CYAN} / {ansi.yellow('cmds')+ansi.CYAN}:{ansi.CLEAR} Command list"))
+            for option in savedata['menu_options']:
+                if not'keywords'in savedata['menu_options'][option]:print(end=ansi.yellow(option)+ansi.cyan(': '),flush=True)
+                elif len(savedata['menu_options'][option]['keywords'])==1:print(end=ansi.yellow(savedata['menu_options'][option]['keywords'][0])+ansi.cyan(': '),flush=True)
+                elif len(savedata['menu_options'][option]['keywords'])==0:print(end=ansi.yellow(option)+ansi.cyan(': '),flush=True)
+                else:
+                    for kw in savedata['menu_options'][option]['keywords'][0:-1]:print(end=ansi.yellow(kw)+ansi.cyan(' / '))
+                    print(end=ansi.yellow(savedata['menu_options'][option]['keywords'][-1])+ansi.cyan(': '))
+                print(savedata['menu_options'][option]['cmd']if'cmd'in savedata['menu_options'][option]else ansi.bold('No description.'))
+            print(ansi.green('Press any key to go back... '),end='',flush=True);read_line()
+        for option in savedata['menu_options']:
+            if 'keywords'in savedata['menu_options'][option]:
+                if len(savedata['menu_options'][option]['keywords'])==0 and ans==option:return savedata['menu_options'][option]['function']()
+                if ans in savedata['menu_options'][option]['keywords']:return savedata['menu_options'][option]['function']()
+            elif ans==option:return savedata['menu_options'][option]['function']()
+
+if __name__=='__main__':
+    while 1:
+        try:init()
+        except(Exception,KeyboardInterrupt)as e:pass
