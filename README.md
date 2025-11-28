@@ -1,4 +1,4 @@
-I will only support windows cus I'm too lazy to make multiple versions  
+I will probably only test the game on Windows
   
 Gissa talet is swedish for guess the number  
 There are 3 ranked gamemodes: easy, medium, hard  
