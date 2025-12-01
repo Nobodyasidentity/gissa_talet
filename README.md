@@ -3,7 +3,8 @@ V3.1 releases soon
 added game logs as `gissa_talet_latest_log.txt`  
 `stfu` command now gives a "y/n" prompt before overriding save file version  
 backwards compatability with pre-v3 versions  
-  
+
+## ...
 I will probably only test the game on Windows
   
 Gissa talet is swedish for guess the number  
