@@ -1,3 +1,5 @@
+V3.1 releases soon  
+  
 I will probably only test the game on Windows
   
 Gissa talet is swedish for guess the number  
