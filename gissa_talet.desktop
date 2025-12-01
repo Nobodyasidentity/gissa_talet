@@ -1,5 +1,0 @@
-[Desktop Entry]
-Name=Gissa Talet V3.1.pre3
-Type=Application
-Terminal=false
-Exec=sh -c 'DIR="$(dirname "$(readlink -f "$0")")"; x-terminal-emulator -e "$DIR/gissa_talet.v3.1.pre3.linux"'
