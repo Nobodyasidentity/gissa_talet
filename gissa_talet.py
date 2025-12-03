@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
-MAXINT=9223372036854775807
-VERSION='3.1.pre3'
+VERSION='3.1.pre5'
 from random import randint
 from pathlib import Path
-import json,os,sys,tempfile,pickle,atexit,signal,traceback,datetime,re
+import json,os,sys,tempfile,pickle,atexit,signal,traceback,datetime,re,platform,subprocess as subp
 class _Log:
     ansi=re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|c)')
     def __init__(s,f):s.f=f
     def write(s,x):sys.__stdout__.write(x);s.f.write(_Log.ansi.sub('',x))
     def flush(s):sys.__stdout__.flush();s.f.flush()
-_log=open(f"gissa_talet_latest_log.txt","w",encoding="utf-8")
-_log.write(f'gissa_talet_latest_log.txt: {datetime.datetime.now():%Y/%m/%d %H:%M:%S}'+'\n\n')
+_log=open(f"gissa_talet_log.txt","w",encoding="utf-8")
+_log.write(f'gissa_talet_log.txt: {datetime.datetime.now():%Y/%m/%d %H:%M:%S}'+'\n\n')
 sys.stdout=_Log(_log)
 sys.excepthook=lambda t,v,tb:traceback.print_exception(t,v,tb)
+class compat:
+    exe=os.path.basename(sys.argv[0])
+    system=platform.system().lower()
+    class build:
+        def linux(exe):
+            term=next((t for t in ("x-terminal-emulator -e","gnome-terminal --","konsole -e","xfce4-terminal -e","xterm -e") if os.system(f"command -v {t.split()[0]} &> /dev/null")==0), None)
+            with open(exe+'.sh',"w") as f:f.write(f'#!/bin/bash{"\n"}DIR="$(cd "$(dirname "$0")" && pwd)"{"\n"}{term+' $DIR/'+exe if term else '$DIR/'+exe}')
+            os.chmod(exe+'.sh',0o755);print(f"Shell launcher created: {exe+'.sh'}")
+        def windows(exe):print("Gissa_talet does not yet support '--build' for Windows")
+    if any(a.lower()in sys.argv for a in("--build","-b")):
+        if system.startswith('linux'):build.linux(exe)
+        elif system.startswith('windows'):build.windows(exe)
+        else:print("Gissa_talet does not support '--build' for "+f'"{system}"')
+        sys.exit(0)
 def cls(*s):print("\033c",end="",flush=True);return''
 class ansi:
     u033,n='\033','\n'
@@ -47,7 +60,7 @@ def _Stfu(*s):
         elif (_=='n')or(_=='no'):return
     savedata[0]['version']=VERSION
     savedata['pc'].save(savedata['name']+'.dat',savedata[0])
-default_savedata_0={'version':VERSION,'highscores':{'easy':int(MAXINT),'medium':int(MAXINT),'hard':int(MAXINT)}}
+default_savedata_0={'version':VERSION,'highscores':{'easy':0,'medium':0,'hard':0}}
 def _Reset(*s):
     global savedata
     while 1:
@@ -58,27 +71,19 @@ def _Reset(*s):
     savedata['pc'].delete(savedata['name']+'.dat')
 def _FIX_SAVEFILE(sf):
     try:
-        if isinstance(sf,(bytes,bytearray)): sf=sf.decode()
-        if isinstance(sf,str): sf=json.loads(sf)
-        if isinstance(sf,dict) and set(sf)=={'e','m','h'}:
-            _={'version':'unknown','highscores':{}}
-            _['highscores']['easy']  = MAXINT if sf['e']==2147483648 else int(sf['e'])
-            _['highscores']['medium']= MAXINT if sf['m']==2147483648 else int(sf['m'])
-            _['highscores']['hard']  = MAXINT if sf['h']==2147483648 else int(sf['h'])
-            return _
-        if isinstance(sf,dict) and 'highscores'in sf:
-            sf.setdefault('version','unknown')
-            return sf
-    except: pass
-    _=dict(default_savedata_0); _['version']='unknown'
-    return _
+        if isinstance(sf,(bytes,bytearray)):sf=sf.decode()
+        if isinstance(sf,str):sf=json.loads(sf)
+        if isinstance(sf,dict)and set(sf)=={'e','m','h'}:return {'version':'unknown','highscores':{'easy':(0 if sf['e']==2147483648 else int(sf['e'])),'medium':(0 if sf['m']==2147483648 else int(sf['m'])),'hard':(0 if sf['h']==2147483648 else int(sf['h']))}}
+        if isinstance(sf,dict)and'highscores'in sf:sf.setdefault('version','unknown');return sf
+    except:pass
+    return dict(default_savedata_0)
 def _Cd(*s, sep=' '):
     global savedata
     savedata['name']=sep.join(str(i)for i in s)
     f=savedata['name']+'.dat'
     p=os.path.join(savedata['pc'].p,f)
     if not os.path.isfile(p) or not os.access(p,os.R_OK):
-        _=dict(default_savedata_0);_['version']='unknown'
+        _=dict(default_savedata_0)
         savedata[0]=_;return
     try:savedata[0]=_FIX_SAVEFILE(savedata['pc'].load(f));return
     except:pass
@@ -97,15 +102,15 @@ def _Cd(*s, sep=' '):
         _=dict(default_savedata_0); _['version']='unknown'
         savedata[0]=dict(default_savedata_0); _['version']='unknown'
 savedata={'pc':storage('savedata'),'name':'default','menu_options':{
-    'exit':{'keywords':['exit'],'function':sys.exit,'cmd':'Exits the game'},
+    'exit':{'function':sys.exit,'cmd':'Exits the game'},
+    '!':{'cmd':'Run special commands'},
     'easy':{'keywords':['easy','e','1'],'function':(lambda*s:Gissa_talet(1,10,'easy')),'description':(ansi.yellow('Easy')+': '+ansi.cyan(1)+' to '+ansi.cyan(10)),'cmd':f'Game mode {ansi.red("->")} easy ( {ansi.cyan("1")} to {ansi.cyan("10")} )'},
     'medium':{'keywords':['medium','m','2'],'function':(lambda*s:Gissa_talet(1,100,'medium')),'description':(ansi.yellow('Medium')+': '+ansi.cyan(1)+' to '+ansi.cyan(100)),'cmd':f'Game mode {ansi.red("->")} medium ( {ansi.cyan("1")} to {ansi.cyan("100")} )'},
     'hard':{'keywords':['hard','h',3],'function':(lambda*s:Gissa_talet(1,1000,'hard')),'description':(ansi.yellow('Hard')+': '+ansi.cyan(1)+' to '+ansi.cyan(1000)),'cmd':f'Game mode {ansi.red("->")} medium ( {ansi.cyan("1")} to {ansi.cyan("1000")} )'},
     'custom':{'keywords':['custom','c','4'],'function':(lambda*s:Gissa_talet(oinput(ansi.CLEAR+'Minimum: '+ansi.CYAN,type=int,Error=ansi.yellow(f'"{ansi.cyan("{}")+ansi.YELLOW}" is not an integer.')),oinput(ansi.CLEAR+'Maximum: '+ansi.CYAN,type=int,Error=ansi.yellow(f'"{ansi.cyan("{}")+ansi.YELLOW}" is not an integer.')),'custom')),'description':(ansi.yellow('Custom')+': You decide!'),'cmd':f'Game mode {ansi.red("->")} custom ( you decide )'},
-    'debug':{'keywords':['debug'],'function':(lambda*s:print(VERSION,MAXINT,dir,get_base_path(),__file__,savedata['pc'].list(),savedata)+read_line()),'cmd':'Info for nerds'},
     'reset':{'keywords':['del','delete','reset'],'function':_Reset,'cmd':' Deletes the save file and resets all saved data'},
     'cd':{'keywords':['chd','save','chs','cs','cd'],'function':(lambda*s:_Cd(oinput(cls()+f'Current save: {ansi.green(savedata["name"])}'+'\nExisting:\n'+ansi.yellow('\n'.join(str(f).removesuffix('.dat')for f in savedata['pc'].list()))+'\nSave name: '+ansi.GREEN))+cls()),'cmd':'Change the currently used save file'},
-    'stfu':{'keywords':['stfu'],'cmd':'Force updates the save file version','function':_Stfu},
+    'stfu':{'cmd':'Force updates the save file version','function':_Stfu},
     }}
 _Cd('default')
 def oinput(*s,sep=' ',type=str,Error="'{}' is not valid",Exit=None,Exit_code=None):
@@ -115,6 +120,8 @@ def oinput(*s,sep=' ',type=str,Error="'{}' is not valid",Exit=None,Exit_code=Non
         try:return type(user_input)
         except (ValueError,TypeError):print(Error.format(user_input))
 def onexit(*s):
+    try:_log.close()
+    except:pass
     print('Game exited.')
     input('<<<')
 atexit.register(onexit);signal.signal(signal.SIGINT,(lambda*s:0))
@@ -128,8 +135,8 @@ def Gissa_talet(minimum,maximum,gamemode='custom',ans=None,attempts=1):
         if ans==rand:
             print(f"{ansi.green('Correct!')} The answer was '{ansi.cyan(rand)}'. It took you {ansi.cyan(attempts)} attempt{"s"if attempts!=1 else""}.")
             if gamemode in savedata[0]['highscores']:
-                if savedata[0]['highscores'][gamemode]>attempts:
-                    savedata[0]['highscores'][gamemode]=int(attempts);print(ansi.bold(ansi.green('That is a new highscore!')))
+                if savedata[0]['highscores'][gamemode]>attempts or savedata[0]['highscores'][gamemode]==0:
+                    savedata[0]['highscores'][gamemode]=int(attempts);print(ansi.bold(ansi.green("That's a new highscore!")))
                     savedata['pc'].save(savedata['name']+'.dat',savedata[0])
             read_line();return
         else:
@@ -142,9 +149,24 @@ def init():
         print(cls()+(f'{ansi.RED}WARNING: SAVE FILE VERSION ({ansi.CYAN+savedata[0]['version']+ansi.RED}) DOES NOT MATCH GAME VERSION ({ansi.CYAN+VERSION+ansi.RED})'+ansi.CLEAR+'\n' if savedata[0]['version']!=VERSION else'')+f'Playing on save: {ansi.green(savedata["name"])+ansi.n+ansi.red(ansi.bold(ansi.underline("GAME MODES")))+ansi.red(":")}')
         for option in savedata['menu_options']:
             if 'description'in savedata['menu_options'][option]:
-                print(savedata['menu_options'][option]['description'],((f"(Highscore: {ansi.cyan(savedata[0]['highscores'][option])} attempt{'s'if savedata[0]['highscores'][option]!=1 else""})"if savedata[0]['highscores'][option]!=MAXINT else'')if option in savedata[0]['highscores'] else''))
+                print(savedata['menu_options'][option]['description'],((f"(Highscore: {ansi.cyan(savedata[0]['highscores'][option])} attempt{'s'if savedata[0]['highscores'][option]!=1 else""})"if savedata[0]['highscores'][option]!=0 else'')if option in savedata[0]['highscores'] else''))
         
         ans=oinput(f"{ansi.RED}Do '{ansi.CYAN}cmd{ansi.RED}' for the command list{ansi.n}"+ansi.green('>>> ')+ansi.CYAN).lower();print(end=ansi.CLEAR,flush=True)
+        if ans.startswith('!'):
+            ans=ans[1:].split()
+            if len(ans)==0:return
+            if ans[0]=='debug':
+                if len(ans)==1:print(VERSION,dir,get_base_path(),__file__,savedata['pc'].list(),savedata);read_line();return
+                else:
+                    try:
+                        _=dict(savedata)
+                        for item in ans[1:]:_=_[item]
+                        print(_);read_line();return
+                    except:print(f"'savedata.{'.'.join(ans[1:])}' does not exist");read_line();return
+            if ans[0]=='build'and len(ans)>1:
+                if ans[1]=='linux':compat.build.linux(compat.exe);read_line();return
+            if ans[0]=='eval'and len(ans)>1:print(eval(' '.join(ans[1:])));read_line();return
+            return
         if ans in ['cmd','commands','cmds']:
             print(f'{ansi.red(ansi.bold("COMMANDS")+":")}'+(f"{ansi.n+ansi.yellow('cmd')+ansi.CYAN} / {ansi.yellow('commands')+ansi.CYAN} / {ansi.yellow('cmds')+ansi.CYAN}:{ansi.CLEAR} Command list"))
             for option in savedata['menu_options']:
@@ -161,7 +183,6 @@ def init():
                 if len(savedata['menu_options'][option]['keywords'])==0 and ans==option:return savedata['menu_options'][option]['function']()
                 if ans in savedata['menu_options'][option]['keywords']:return savedata['menu_options'][option]['function']()
             elif ans==option:return savedata['menu_options'][option]['function']()
-
 if __name__=='__main__':
     while 1:
         try:init()
